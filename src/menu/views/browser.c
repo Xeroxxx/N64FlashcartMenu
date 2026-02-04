@@ -10,8 +10,7 @@
 #include "utils/fs.h"
 #include "views.h"
 #include "../sound.h"
-
-
+#include <fatfs/ff.h>
 
 static const char *archive_extensions[] = { "zip", NULL };
 static const char *cheat_extensions[] = {"cht", "cheats", "datel", "gameshark", NULL};
@@ -58,6 +57,18 @@ static const struct substr hidden_prefixes[] = {
 };
 #define HIDDEN_PREFIXES_COUNT (sizeof(hidden_prefixes) / sizeof(hidden_prefixes[0]))
 
+static bool file_is_fat_hidden (const char *full_path) {
+    FILINFO fno;
+    FRESULT res;
+    
+    res = f_stat(full_path, &fno);
+    
+    if (res == FR_OK) {
+        return (fno.fattrib & AM_HID) != 0;
+    }
+    
+    return false;
+}
 
 static bool path_is_hidden (path_t *path) {
     char *stripped_path = strip_fs_prefix(path_get(path));
@@ -79,12 +90,17 @@ static bool path_is_hidden (path_t *path) {
             return true;
         }
     }
+    
     // Check for hidden files based on filename prefix
     for (size_t i = 0; i < HIDDEN_PREFIXES_COUNT; i++) {
         if (basename_len > hidden_prefixes[i].len &&
             strncmp(basename, hidden_prefixes[i].str, hidden_prefixes[i].len) == 0) {
             return true;
         }
+    }
+
+    if (file_is_fat_hidden(path_get(path))) {
+        return true;
     }
 
     return false;
